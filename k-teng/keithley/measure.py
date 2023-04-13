@@ -15,17 +15,23 @@ smua.measure.rangev = 20
 """
 
 script_dir = "scripts/"
-
 scripts = {
     "buffer_reset":     "buffer_reset.lua",
     "smua_reset":       "smua_reset.lua",
 }
+for key,val in scripts.items():
+    scripts[key] = script_dir + scripts[key]
 
 
 def run_lua(instr, script_path, verbose=False):
-    with open(script_dir + script_path, "r") as file:
+    """
+    Run a lua script from the host on the instrument
+    @param instr : pyvisa instrument
+    @param script_path : full path to the script
+    """
+    with open(script_path, "r") as file:
         script = file.read()
-    if verbose: print(f"Running script: {script_dir + script_path}")
+    if verbose: print(f"Running script: {script_path}")
     instr.write(script)
 
 
@@ -41,7 +47,11 @@ def measure_V(instr, count=100, interval=0.05):
         plt.show()
         sleep(0.05)
 
-def reset(instr):
+def reset(instr, verbose=False):
+    """
+    Reset smua and its buffers
+    @param instr : pyvisa instrument
+    """
     run_lua(instr, scripts["smua_reset"], verbose=verbose)
     run_lua(instr, scripts["buffer_reset"], verbose=verbose)
 
@@ -49,8 +59,9 @@ def reset(instr):
 def measure_count(instr, V=True, I=True, count=100, interval=0.05, beep_done=True, verbose=True):
     """
     take n measurements at dt interval
+    @param instr : pyvisa instrument
     """
-    reset(instr)
+    reset(instr, verbose=verbose)
     f_meas = None
     if V and I:
         f_meas = "smua.measure.iv(smua.nvbuffer1, smua.nvbuffer2)"
@@ -71,25 +82,6 @@ def measure_count(instr, V=True, I=True, count=100, interval=0.05, beep_done=Tru
 
     if beep_done:
         instr.write("beeper.beep(0.3, 1000)")
-
-
-def collect_buffer(instr, buffer_nr=1):
-    """
-    get the buffer as 2D - np.array
-        i - ith reading
-            0: timestamps
-            1: readings
-    """
-    if buffer_nr == 2: buffername = "smua.nvbuffer2"
-    else: buffername = "smua.nvbuffer1"
-    # instr.write("format.data = format.DREAL\nformat.byteorder = format.LITTLEENDIAN")
-    # buffer = instr.query_binary_values(f"printbuffer(1, {buffername}.n, {buffername})", datatype='d', container=np.array)
-    instr.write("format.data = format.ASCII\nformat.asciiprecision = 7")
-    timestamps = instr.query_ascii_values(f"printbuffer(1, {buffername}.n, {buffername}.timestamps)", container=np.array)
-    readings = instr.query_ascii_values(f"printbuffer(1, {buffername}.n, {buffername}.readings)", container=np.array)
-    print(f"readings: {readings}, \ntimestamps: {timestamps}")
-    buffer = np.vstack((timestamps, readings)).T
-    return buffer
 
 
 

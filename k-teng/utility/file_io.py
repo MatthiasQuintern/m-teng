@@ -13,15 +13,14 @@ def get_next_filename(basename, directory=".", digits=3):
     get the next filename (without extenstion).
     example:
         basename = file
-        directory has file001, file002, file004
+        directory has file001.csv, file002.pkl, file004.csv
         -> return file005
     """
     files = listdir(directory)
     files.sort()
     files.reverse()
-    lowest_number = 0
+    lowest_number = -1
     for file in files:
-        if not path.isfile(file): continue
         if not file.startswith(basename): continue
         try:
             number = int(file.split('.')[0].strip(basename))
@@ -30,4 +29,4 @@ def get_next_filename(basename, directory=".", digits=3):
         except ValueError:
             continue
 
-    return basename + add_zeros(lowest_number)
+    return basename + add_zeros(lowest_number+1)
