@@ -1,6 +1,10 @@
 """
 run this before using this library:
 ipython -i keithley_interactive.py
+
+always records iv-t curves
+    i-data -> smua.nvbuffer1
+    v-data -> smua.nvbuffer2
 """
 
 import numpy as np
@@ -25,7 +29,7 @@ if __name__ == "__main__":
 
 
 from .keithley import keithley as _keithley
-from .utility import data
+from .utility import data as _data
 from .utility import file_io
 from .utility import testing
 
@@ -61,49 +65,71 @@ def _measure(max_measurements=None, max_points_shown=None, monitor=False):
     global k, settings, test, _runtime_vars
     print(f"Starting measurement with:\n\tinterval = {settings['interval']}s\nUse <C-c> to stop. Save the data using 'save_csv()' afterwards.")
     _runtime_vars["last_measurement"] = dtime.now().isoformat()
+    if not test:
+        _keithley.reset(k, verbose=True)
+        k.write("smua.source.output = 1")
+        k.write("format.data = format.ASCII\nformat.asciiprecision = 12")
     # jupyter:
     # clear_output(wait=True)
     # plt.plot(data)
     # plt.show()
     index = []
-    data = []
+    vdata = []
+    idata = []
     if monitor:
         plt.ion()
-        fig = plt.figure()
-        ax = fig.add_subplot(ylabel="Voltage [V]")
-        line1,  = ax.plot(index, data)
+        fig1, (vax, iax) = plt.subplots(2, 1)
+
+        vline,  = vax.plot(index, vdata, color="g")
+        vax.set_ylabel("Voltage [V]")
+        vax.grid(True)
+
+        iline,  = iax.plot(index, idata, color="m")
+        iax.set_ylabel("Current [A]")
+        iax.grid(True)
     try:
         i = 0
         while max_measurements is None or i < max_measurements:
             index.append(i)
             if test:
-                data.append(testing.testcurve(i))
-                # data.append(tuple(float(v) for v in instr.query("print(smua.measure.v())").strip('\n').split('\t')))
-            else:
-                data.append(k.query("print(smua.measure.v())").strip('\n'))
+                idata.append(testing.testcurve(i, peak_width=1, amplitude=5e-8))
+                vdata.append(-testing.testcurve(i, peak_width=2, amplitude=15))
                 # data.append(np.random.rand())
-            print(f"{i:5d} - {data[-1]:.5f} V", end='\r')
+            else:
+                # data.append(float(k.query("print(smua.measure.v(smua.nvbuffer1))").strip('\n')))
+                i_val, v_val = tuple(float(v) for v in k.query("print(smua.measure.iv(smua.nvbuffer1, smua.nvbuffer2))").strip('\n').split('\t'))
+                idata.append(i_val)
+                vdata.append(v_val)
+            print(f"{i:5d} - {idata[-1]:.12f} A - {vdata[-1]:.5f} V", end='\r')
             if monitor:
                 # update data
-                line1.set_xdata(index)
-                line1.set_ydata(data)
+                iline.set_xdata(index)
+                iline.set_ydata(idata)
+                vline.set_xdata(index)
+                vline.set_ydata(vdata)
                 # recalculate limits and set them for the view
-                ax.relim()
+                iax.relim()
+                vax.relim()
                 if max_points_shown and i > max_points_shown:
-                    ax.set_xlim(i - max_points_shown, i)
-                ax.autoscale_view()
+                    iax.set_xlim(i - max_points_shown, i)
+                    vax.set_xlim(i - max_points_shown, i)
+                iax.autoscale_view()
+                vax.autoscale_view()
                 # update plot
-                fig.canvas.draw()
-                fig.canvas.flush_events()
+                fig1.canvas.draw()
+                fig1.canvas.flush_events()
             sleep(settings["interval"])
             i += 1
     except KeyboardInterrupt:
+        if not test:
+            k.write("smua.source.output = 0")
         if monitor:
-            plt.close(fig)
+            plt.close(fig1)
         print("Measurement stopped" + " "*50)
+    return vdata, idata
 
 
-def monitor(max_measurements=None, max_points_shown=None, ):
+def monitor(max_measurements=None, max_points_shown=160):
     """
     Monitor the voltage with matplotlib.
 
@@ -131,17 +157,23 @@ def measure(max_measurements=None):
 
 
 def get_dataframe():
+    """
+    Get a pandas dataframe from the data in smua.nvbuffer1
+    """
     global k, settings, _runtime_vars
     if test:
         timestamps = np.arange(0, 50, 0.01)
-        ydata = np.array([testing.testcurve(t) for t in timestamps])
-        buffer = np.vstack((timestamps, ydata)).T
+        ydata = np.array([testing.testcurve(t, amplitude=15, peak_width=2) for t in timestamps])
+        ibuffer = np.vstack((timestamps, ydata)).T
+
+        ydata = np.array([-testing.testcurve(t, amplitude=5e-8, peak_width=1) for t in timestamps])
+        vbuffer = np.vstack((timestamps, ydata)).T
     else:
-        buffer = _keithley.collect_buffer(k, 1)
-    df = data.buffer2dataframe(buffer)
+        ibuffer = _keithley.collect_buffer(k, 1)
+        vbuffer = _keithley.collect_buffer(k, 2)
+    df = _data.buffers2dataframe(ibuffer, vbuffer)
     df.basename = file_io.get_next_filename(settings["name"], settings["datadir"])
     df.name = f"{df.basename} @ {_runtime_vars['last-measurement']}"
-    df.columns = ["Time [s]", "Voltage [V]"]
     return df
 
 def save_csv():
@@ -201,6 +233,9 @@ def set(setting, value):
             return
     settings[setting] = value
 
+def name(s:str):
+    global settings
+    settings["name"] = s
 
 def save_settings():
     with open(config_path, "w") as file:
@@ -218,9 +253,10 @@ def help(topic=None):
 Functions:
     measure         - measure the voltage
     monitor         - measure the voltage with live monitoring in a matplotlib window
+    get_dataframe   - return smua.nvbuffer1 as pandas dataframe
     save_csv        - save the last measurement as csv file
     save_pickle     - save the last measurement as pickled pandas dataframe
-    load_dataframe  - load a pandas dataframe from csv or pickle 
+    load_dataframe  - load a pandas dataframe from csv or pickle
     run_script      - run a lua script on the Keithely device
 Run 'help(function)' to see more information on a function
 
@@ -238,9 +274,10 @@ Run 'help("topic")' to see more information on a topic""")
     beep: bool      - wether the device should beep or not
 
 Functions:
-    TODO set("setting", value)  - set a setting to a value
-    TODO save_settings()        - store the settings as "k-teng.conf" in the working directory
-    TODO load_settings()        - load settings from a file
+    name("<name>")         - short for set("name", "<name>")
+    set("setting", value)  - set a setting to a value
+    save_settings()        - store the settings as "k-teng.conf" in the working directory
+    load_settings()        - load settings from a file
     The global variable 'config_path' determines the path used by save/load_settings. Use -c '<path>' to set another path.
     The serach path is:
         <working-dir>/k-teng.json

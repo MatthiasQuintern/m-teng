@@ -5,7 +5,7 @@ import numpy as np
 """
 Utility
 """
-script_dir = "scripts/"
+script_dir = "../scripts/"
 scripts = {
     "buffer_reset":     "buffer_reset.lua",
     "smua_reset":       "smua_reset.lua",
@@ -54,7 +54,7 @@ def reset(instr, verbose=False):
     run_lua(instr, scripts["buffer_reset"], verbose=verbose)
 
 
-def collect_buffer(instr, buffer_nr=1):
+def collect_buffer(instr, buffer_nr=1, verbose=False):
     """
     Get the buffer as 2D - np.array
     @param instr : pyvisa instrument
@@ -71,7 +71,8 @@ def collect_buffer(instr, buffer_nr=1):
     instr.write("format.data = format.ASCII\nformat.asciiprecision = 7")
     timestamps = instr.query_ascii_values(f"printbuffer(1, {buffername}.n, {buffername}.timestamps)", container=np.array)
     readings = instr.query_ascii_values(f"printbuffer(1, {buffername}.n, {buffername}.readings)", container=np.array)
-    print(f"readings: {readings}, \ntimestamps: {timestamps}")
+    if verbose:
+        print(f"readings from {buffername}: {readings}, \ntimestamps: {timestamps}")
     buffer = np.vstack((timestamps, readings)).T
     return buffer
 
