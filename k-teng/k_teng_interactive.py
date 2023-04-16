@@ -30,6 +30,7 @@ if __name__ == "__main__":
 
 from .keithley import keithley as _keithley
 from .utility import data as _data
+from .utility.data import load_dataframe
 from .utility import file_io
 from .utility import testing
 
@@ -155,6 +156,15 @@ def measure(max_measurements=None):
     You can take the data from the buffer afterwards, using save_csv """
     _measure(max_measurements=max_measurements, monitor=False)
 
+def automeasure(repeat, repeat_delay=0, max_measurements=None, max_points_shown=120, monitor=True):
+    """
+    Measure and save to csv multiple times
+    """
+    for i in range(repeat):
+        _measure(max_measurements=max_measurements, max_points_shown=max_points_shown, monitor=monitor)
+        save_csv()
+        sleep(repeat_delay)
+
 
 def get_dataframe():
     """
@@ -199,20 +209,6 @@ def save_pickle():
     df.to_pickle(filename)
     print(f"Saved as '{filename}'")
 
-def load_dataframe(p:str):
-    """
-    Load a dataframe from file.
-    @param p : path of the file. If it has 'csv' extension, pandas.read_csv is used, pandas.read_pickle otherwise
-    """
-    if not path.isfile(p):
-        print(f"ERROR: load_dataframe: File does not exist: {p}")
-        return None
-    if p.endswith(".csv"):
-        df = pd.read_csv(p)
-    else:
-        df = pd.read_pickle(p)
-    return df
-
 def run_script(script_path):
     """
     Run a lua script on the Keithley device
@@ -253,6 +249,7 @@ def help(topic=None):
 Functions:
     measure         - measure the voltage
     monitor         - measure the voltage with live monitoring in a matplotlib window
+    automeasure     - measure and save to csv multiple times
     get_dataframe   - return smua.nvbuffer1 as pandas dataframe
     save_csv        - save the last measurement as csv file
     save_pickle     - save the last measurement as pickled pandas dataframe

@@ -14,7 +14,6 @@ for key,val in scripts.items():
     scripts[key] = script_dir + scripts[key]
 
 
-
 def init_keithley(beep_success=True):
     rm = pyvisa.ResourceManager('@py')
     resources = rm.list_resources()
