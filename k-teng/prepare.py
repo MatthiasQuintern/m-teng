@@ -94,16 +94,24 @@ def calc_peaks(peaks):
     return vpeaks
 
 
-def normalize(a):
+class Normalize:
     """
-    normalize so that all values are between 0 and 1
+    normalize so that all values are between low and high
     """
-    min_ = np.min(a)
-    a = a - min_
-    max_ = np.max(a)
-    if max_ != 0:
-        a = a / max_
-    return a
+    def __init__(self, low=0, high=1):
+        assert(low < high)
+        self.low = low
+        self.high = high
+    def __call__(self, array):
+        min_ = np.min(array)
+        a = a - min_
+        max_ = np.max(array)
+        if max_ != 0:
+            a = (a / max_)
+        # now normalized between 0 and 1
+        a *= (self.high - self.low)
+        a -= self.low
+        return a
 
 if __name__ == "__main__":
     """
@@ -112,7 +120,7 @@ if __name__ == "__main__":
     """
     df = load_dataframe(file)
     a = df.to_numpy()
-    vdata = normalize(a[:,2])
+    vdata = Normalize(0, 1)(a[:,2])
     plt.ion()
     # vpeaks[0] is the list of the peaks
     vpeaks = signal.find_peaks(vdata)[0]
