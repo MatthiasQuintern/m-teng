@@ -23,7 +23,8 @@ def get_next_filename(basename, directory=".", digits=3):
     for file in files:
         if not file.startswith(basename): continue
         try:
-            number = int(file.split('.')[0].strip(basename))
+            number = file[:file.rfind('.')].replace(basename, "")
+            number = int(number)
             if number < lowest_number: continue
             lowest_number = number
         except ValueError:
