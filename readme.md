@@ -1,24 +1,22 @@
 # K-TENG
-Helper scripts for measuring **T**ribo**e**lectric **N**ano**g**enerator-based sensor output with a Keithley 2611B SMU using pyvisa
+Helper scripts and shell for measuring **T**ribo**e**lectric **N**ano**g**enerator-based sensor output with a Keithley 2611B SMU using pyvisa
 
 ## Features
 ### Useful functions for scripts
-- Measure Voltage
-- Measure Voltage and Current
-- Save to host
-- run lua script
-- auto-filenames
+- Measure Voltage and/or Current
+- Transfer buffer from device to host
+- Save/load as csv
+- Run lua script on device
+- Auto-filenames
 ### Interactive (shell) mode
 - Live view
-- press buttons for start and fin
-- settings:
-    - interval
-    - count
-- easily run arbitrary command on device
+- Press button to stop
+- Save and load settings (default interval, data directory...)
+- Easily run arbitrary command on device
 
 ## Shell mode
 Start with:
-```python
+```shell
 ipython -i k_teng_interactive.py
 ```
 
