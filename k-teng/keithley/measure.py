@@ -1,115 +1,106 @@
 from time import sleep
 import numpy as np
 from matplotlib import pyplot as plt
+import pyvisa
 
-smua_settings = """
-display.clear()
-display.settext('starting')
-smua.reset()
-smua.measure.autorangev = smua.AUTORANGE_ON
-smua.measure.autozero = smua.AUTOZERO_ONCE
-smua.source.output = smua.OUTPUT_OFF
--- max 20 V expected
-smua.measure.rangev = 20
+from .keithley import reset
+from ..utility import testing as _testing
 
-"""
-
-script_dir = "scripts/"
-scripts = {
-    "buffer_reset":     "buffer_reset.lua",
-    "smua_reset":       "smua_reset.lua",
-}
-for key,val in scripts.items():
-    scripts[key] = script_dir + scripts[key]
-
-
-def run_lua(instr, script_path, verbose=False):
+def measure_count(instr, V=True, I=True, count=100, interval=0.05, update_func=None, update_interval=0.5, beep_done=True, verbose=True, testing=False):
     """
-    Run a lua script from the host on the instrument
-    @param instr : pyvisa instrument
-    @param script_path : full path to the script
-    """
-    with open(script_path, "r") as file:
-        script = file.read()
-    if verbose: print(f"Running script: {script_path}")
-    instr.write(script)
+    Take <count> measurements with <interval> inbetween
 
-
-def measure_V(instr, count=100, interval=0.05):
+    @details
+        Uses the devices overlappedY function to make the measurements asynchronosly
+        The update_func is optional and only used when I == True and V == True
+        The update_func does not necessarily get all the values that are measured. To obtain the whole measurement, get them from the device buffers (smua.nvbufferX)
+    @param instr: pyvisa instrument
+    @param update_func: Callable that processes the measurements: (index, ival, vval) -> None
+    @param update_interval: interval at which the update_func is called
     """
-    """
-    data = []
-    for _ in range(1000):
-        data.append(tuple(float(v) for v in instr.query("print(smua.measure.v())").strip('\n').split('\t')))
-        # print(i, data[-1])
-        # clear_output(wait=True)
-        plt.plot(data)
-        plt.show()
-        sleep(0.05)
-
-def reset(instr, verbose=False):
-    """
-    Reset smua and its buffers
-    @param instr : pyvisa instrument
-    """
-    run_lua(instr, scripts["smua_reset"], verbose=verbose)
-    run_lua(instr, scripts["buffer_reset"], verbose=verbose)
-
-
-def measure_count(instr, V=True, I=True, count=100, interval=0.05, beep_done=True, verbose=True):
-    """
-    take n measurements at dt interval
-    @param instr : pyvisa instrument
-    """
-    reset(instr, verbose=verbose)
     f_meas = None
     if V and I:
-        f_meas = "smua.measure.iv(smua.nvbuffer1, smua.nvbuffer2)"
+        f_meas = "smua.measure.overlappediv(smua.nvbuffer1, smua.nvbuffer2)"
     elif V:
-        f_meas = "smua.measure.v(smua.nvbuffer1)"
+        f_meas = "smua.measure.overlappedv(smua.nvbuffer1)"
     elif I:
-        f_meas = "smua.measure.i(smua.nvbuffer1)"
+        f_meas = "smua.measure.overlappedi(smua.nvbuffer1)"
     else:
         print("I and/or V needs to be set to True")
         return
 
-    instr.write(f"smua.measure.count = {count}")
-    instr.write(f"smua.measure.interval = {interval}")
+    i = 0
+    if not testing:
+        reset(instr, verbose=verbose)
+        instr.write(f"smua.measure.count = {count}")
+        instr.write(f"smua.measure.interval = {interval}")
 
-    instr.write(f"smua.source.output = smua.OUTPUT_ON")
-    instr.write(f_meas)
-    instr.write(f"smua.source.output = smua.OUTPUT_OFF")
+        # start measurement
+        instr.write(f"smua.source.output = smua.OUTPUT_ON")
+        instr.write(f_meas)
 
-    if beep_done:
-        instr.write("beeper.beep(0.3, 1000)")
+        condition = lambda: float(instr.query("print(status.operation.measuring.condition)").strip("\n ")) != 0
+    else:
+        condition = lambda: i < int(float(count) * interval / update_interval)
+
+    sleep(update_interval)
+    # for live viewing
+
+    # will return 2.0 while measruing
+    while condition():
+        if update_func and V and I:
+            try:
+                if not testing:
+                    ival = float(instr.query("print(smua.nvbuffer1.readings[smua.nvbuffer1.n])").strip("\n"))
+                    vval = float(instr.query("print(smua.nvbuffer2.readings[smua.nvbuffer2.n])").strip("\n"))
+                else:
+                    ival = _testing.testcurve(i, peak_width=1, amplitude=5e-8)
+                    vval = -_testing.testcurve(i, peak_width=2, amplitude=15)
+                update_func(i, ival, vval)
+            except ValueError:
+                pass
+        sleep(update_interval)
+        i += 1
+
+    if not testing:
+        instr.write(f"smua.source.output = smua.OUTPUT_OFF")
+
+        if beep_done:
+            instr.write("beeper.beep(0.3, 1000)")
 
 
-
-def event_test_TODO():
-        # Type of event we want to be notified about
-    event_type = pyvisa.constants.EventType.service_request
-    # Mechanism by which we want to be notified
-    event_mech = pyvisa.constants.EventMechanism.queue
-    keithley.enable_event(event_type, event_mech)
-
-    # Instrument specific code to enable service request
-    # (for example on operation complete OPC)
-    keithley.write("*SRE 1")
-    keithley.write("INIT")
-
-
-    with open("script.lua", "r") as file:
-        script = file.read()
-    # for line in script.split('\n'):
-    #     input(line)
-    #     keithley.write(line)
-    keithley.write(script)
-
-    # Wait for the event to occur
-    response = keithley.wait_on_event(event_type, 1000)
-    assert response.event.event_type == event_type
-    assert response.timed_out == False
-
-    instr.disable_event(event_type, event_mech)
-    keithley.query_ascii_values("printbuffer(1, 10, smua.nvbuffer1)", 6)
-    print(voltages)
+def measure(instr, interval, update_func=None, max_measurements=None, testing=False):
+    """
+    @details:
+        - Resets the buffers
+        - Until KeyboardInterrupt:
+            - Take measurement
+            - Call update_func
+            - Wait interval
+        Uses python's time.sleep() for waiting the interval, which is not very precise. Use measure_count for better precision
+        You can take the data from the buffer afterwards, using save_csv
+    @param instr: pyvisa instrument
+    @param update_func: Callable that processes the measurements: (index, ival, vval) -> None
+    @param max_measurements : maximum number of measurements. None means infinite
+    """
+    if not testing:
+        reset(instr, verbose=True)
+        instr.write("smua.source.output = smua.OUTPUT_ON")
+        instr.write("format.data = format.ASCII\nformat.asciiprecision = 12")
+    try:
+        i = 0
+        while max_measurements is None or i < max_measurements:
+            if testing:
+                ival = _testing.testcurve(i, peak_width=1, amplitude=5e-8)
+                vval = -_testing.testcurve(i, peak_width=2, amplitude=15)
+            else:
+                ival, vval = tuple(float(v) for v in instr.query("print(smua.measure.iv(smua.nvbuffer1, smua.nvbuffer2))").strip('\n').split('\t'))
+            if update_func:
+                update_func(i, ival, vval)
+            sleep(interval)
+            i += 1
+    except KeyboardInterrupt:
+        pass
+    if not testing:
+        instr.write("smua.source.output = smua.OUTPUT_OFF")
+    print("Measurement stopped" + " "*50)

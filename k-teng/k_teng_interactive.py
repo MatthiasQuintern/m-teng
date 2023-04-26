@@ -1,6 +1,6 @@
 """
 run this before using this library:
-ipython -i keithley_interactive.py
+ipython -i k_teng_interactive.py
 
 always records iv-t curves
     i-data -> smua.nvbuffer1
@@ -29,10 +29,10 @@ if __name__ == "__main__":
 
 
 from .keithley import keithley as _keithley
+from .keithley.measure import measure_count as _measure_count, measure as _measure
 from .utility import data as _data
 from .utility.data import load_dataframe
 from .utility import file_io
-from .utility import testing
 
 _runtime_vars = {
     "last-measurement": ""
@@ -41,7 +41,7 @@ _runtime_vars = {
 settings = {
     "datadir":      path.expanduser("~/data"),
     "name":         "measurement",
-    "interval":     0.01,
+    "interval":     0.02,
     "beep":         True,
 }
 config_path = path.expanduser("~/.config/k-teng.json")
@@ -52,85 +52,113 @@ test = False
 k = None
 
 
-def _measure(max_measurements=None, max_points_shown=None, monitor=False):
+
+def _update_print(i, ival, vval):
+    print(f"{i:5d} - {ival:.12f} A - {vval:.5f} V" + " "*10, end='\r')
+
+class _Monitor:
     """
-    Monitor the voltage with matplotlib.
+    Monitor v and i data
+    """
+    def __init__(self, max_points_shown=None, use_print=False):
+        self.max_points_shown = max_points_shown
+        self.use_print = use_print
+        self.index = []
+        self.vdata = []
+        self.idata = []
+
+        plt.ion()
+        self.fig1, (self.vax, self.iax) = plt.subplots(2, 1)
+
+        self.vline,  = self.vax.plot(self.index, self.vdata, color="g")
+        self.vax.set_ylabel("Voltage [V]")
+        self.vax.grid(True)
+
+        self.iline,  = self.iax.plot(self.index, self.idata, color="m")
+        self.iax.set_ylabel("Current [A]")
+        self.iax.grid(True)
+
+    def update(self, i, ival, vval):
+        if self.use_print:
+            _update_print(i, ival, vval)
+        self.index.append(i)
+        self.idata.append(ival)
+        self.vdata.append(vval)
+        # update data
+        self.iline.set_xdata(self.index)
+        self.iline.set_ydata(self.idata)
+        self.vline.set_xdata(self.index)
+        self.vline.set_ydata(self.vdata)
+        # recalculate limits and set them for the view
+        self.iax.relim()
+        self.vax.relim()
+        if self.max_points_shown and i > self.max_points_shown:
+            self.iax.set_xlim(i - self.max_points_shown, i)
+            self.vax.set_xlim(i - self.max_points_shown, i)
+        self.iax.autoscale_view()
+        self.vax.autoscale_view()
+        # update plot
+        self.fig1.canvas.draw()
+        self.fig1.canvas.flush_events()
+
+    def __del__(self):
+        plt.close(self.fig1)
+
+
+def monitor_count(count=5000, interval=settings["interval"], max_points_shown=160):
+    """
+    Take <count> measurements in <interval> and monitor live with matplotlib.
 
     @details:
         - Resets the buffers
         - Opens a matplotlib window and takes measurements depending on settings["interval"]
-        - Waits for the user to press a key
-    @param max_points_shown : how many points should be shown at once. None means infinite
-    @param max_measurements : maximum number of measurements. None means infinite
-    You can take the data from the buffer afterwards, using save_csv """
-    global k, settings, test, _runtime_vars
-    print(f"Starting measurement with:\n\tinterval = {settings['interval']}s\nUse <C-c> to stop. Save the data using 'save_csv()' afterwards.")
-    _runtime_vars["last_measurement"] = dtime.now().isoformat()
-    if not test:
-        _keithley.reset(k, verbose=True)
-        k.write("smua.source.output = 1")
-        k.write("format.data = format.ASCII\nformat.asciiprecision = 12")
-    # jupyter:
-    # clear_output(wait=True)
-    # plt.plot(data)
-    # plt.show()
-    index = []
-    vdata = []
-    idata = []
-    if monitor:
-        plt.ion()
-        fig1, (vax, iax) = plt.subplots(2, 1)
+        Uses the device internal overlappedY measurement method, which allows for greater precision
+        You can take the data from the buffer afterwards, using save_csv
+    @param count: count
+    @param interval: interval, defaults to settings["interval"]
+    @param max_points_shown: how many points should be shown at once. None means infinite
+    """
+    plt_monitor = _Monitor(max_points_shown, use_print=True)
+    update_func = plt_monitor.update
 
-        vline,  = vax.plot(index, vdata, color="g")
-        vax.set_ylabel("Voltage [V]")
-        vax.grid(True)
-
-        iline,  = iax.plot(index, idata, color="m")
-        iax.set_ylabel("Current [A]")
-        iax.grid(True)
+    print(f"Starting measurement with:\n\tinterval = {interval}s\nSave the data using 'save_csv()' afterwards.")
     try:
-        i = 0
-        while max_measurements is None or i < max_measurements:
-            index.append(i)
-            if test:
-                idata.append(testing.testcurve(i, peak_width=1, amplitude=5e-8))
-                vdata.append(-testing.testcurve(i, peak_width=2, amplitude=15))
-                # data.append(np.random.rand())
-            else:
-                # data.append(float(k.query("print(smua.measure.v(smua.nvbuffer1))").strip('\n')))
-                i_val, v_val = tuple(float(v) for v in k.query("print(smua.measure.iv(smua.nvbuffer1, smua.nvbuffer2))").strip('\n').split('\t'))
-                idata.append(i_val)
-                vdata.append(v_val)
-            print(f"{i:5d} - {idata[-1]:.12f} A - {vdata[-1]:.5f} V", end='\r')
-            if monitor:
-                # update data
-                iline.set_xdata(index)
-                iline.set_ydata(idata)
-                vline.set_xdata(index)
-                vline.set_ydata(vdata)
-                # recalculate limits and set them for the view
-                iax.relim()
-                vax.relim()
-                if max_points_shown and i > max_points_shown:
-                    iax.set_xlim(i - max_points_shown, i)
-                    vax.set_xlim(i - max_points_shown, i)
-                iax.autoscale_view()
-                vax.autoscale_view()
-                # update plot
-                fig1.canvas.draw()
-                fig1.canvas.flush_events()
-            sleep(settings["interval"])
-            i += 1
+        _measure_count(k, V=True, I=True, count=count, interval=interval, beep_done=False, verbose=False, update_func=update_func, update_interval=0.05, testing=test)
     except KeyboardInterrupt:
         if not test:
-            k.write("smua.source.output = 0")
-        if monitor:
-            plt.close(fig1)
-        print("Measurement stopped" + " "*50)
-    return vdata, idata
+            k.write(f"smua.source.output = smua.OUTPUT_OFF")
+        print("Monitoring cancelled, measurement might still continue" + " "*50)
+    else:
+        print("Measurement finished" + " "*50)
+
+def measure_count(count=5000, interval=settings["interval"]):
+    """
+    Take <count> measurements in <interval>
+
+    @details:
+        - Resets the buffers
+        - Takes <count> measurements depending on settings["interval"]
+        Uses the device internal overlappedY measurement method, which allows for greater precision
+        You can take the data from the buffer afterwards, using save_csv
+    @param count: count
+    @param interval: interval, defaults to settings["interval"]
+    """
+    update_func = _update_print
+
+    print(f"Starting measurement with:\n\tinterval = {interval}s\nSave the data using 'save_csv()' afterwards.")
+    try:
+        _measure_count(k, V=True, I=True, count=count, interval=interval, beep_done=False, verbose=False, update_func=update_func, update_interval=0.05, testing=test)
+    except KeyboardInterrupt:
+        if not test:
+            k.write(f"smua.source.output = smua.OUTPUT_OFF")
+        print("Monitoring cancelled, measurement might still continue" + " "*50)
+    else:
+        print("Measurement finished" + " "*50)
 
 
-def monitor(max_measurements=None, max_points_shown=160):
+
+
+def monitor(interval=settings["interval"], max_measurements=None, max_points_shown=160):
     """
     Monitor the voltage with matplotlib.
 
@@ -138,13 +166,20 @@ def monitor(max_measurements=None, max_points_shown=160):
         - Resets the buffers
         - Opens a matplotlib window and takes measurements depending on settings["interval"]
         - Waits for the user to press a key
+        Uses python's time.sleep() for waiting the interval, which is not very precise. Use measure_count for better precision.
+        You can take the data from the buffer afterwards, using save_csv.
     @param max_points_shown : how many points should be shown at once. None means infinite
     @param max_measurements : maximum number of measurements. None means infinite
-    You can take the data from the buffer afterwards, using save_csv """
-    _measure(max_measurements=max_measurements, max_points_shown=max_points_shown, monitor=True)
+    """
+    global _runtime_vars
+    _runtime_vars["last_measurement"] = dtime.now().isoformat()
+    print(f"Starting measurement with:\n\tinterval = {interval}s\nUse <C-c> to stop. Save the data using 'save_csv()' afterwards.")
+    plt_monitor = _Monitor(use_print=True, max_points_shown=max_points_shown)
+    update_func = plt_monitor.update
+    _measure(k, interval=interval, max_measurements=max_measurements, update_func=update_func, testing=test)
 
 
-def measure(max_measurements=None):
+def measure(interval=settings["interval"], max_measurements=None):
     """
     Measure voltages
 
@@ -152,23 +187,45 @@ def measure(max_measurements=None):
         - Resets the buffers
         - Measure voltages
         - Waits for the user to press a key
+        Uses python's time.sleep() for waiting the interval, which is not very precise. Use measure_count for better precision.
+        You can take the data from the buffer afterwards, using save_csv.
     @param max_measurements : maximum number of measurements. None means infinite
-    You can take the data from the buffer afterwards, using save_csv """
-    _measure(max_measurements=max_measurements, monitor=False)
+    """
+    global _runtime_vars
+    _runtime_vars["last_measurement"] = dtime.now().isoformat()
+    print(f"Starting measurement with:\n\tinterval = {interval}s\nUse <C-c> to stop. Save the data using 'save_csv()' afterwards.")
+    update_func = _update_print
+    _measure(k, interval=interval, max_measurements=max_measurements, update_func=update_func, testing=test)
 
-def automeasure(repeat, repeat_delay=0, max_measurements=None, max_points_shown=120, monitor=True):
+
+def repeat(measure_func: callable, count: int, repeat_delay=0):
     """
     Measure and save to csv multiple times
+
+    @details
+        Repeat count times:
+        - call measure_func
+        - call save_csv
+        - sleep for repeat_delay
+
+    @param measure_func: The measurement function to use. Use a lambda to bind your parameters!
+    @param count: Repeat count times
+
+    Example: Repeat 10 times:
+        repeat(lambda : monitor_count(count=6000, interval=0.02, max_points_shown=200), 10)
     """
-    for i in range(repeat):
-        _measure(max_measurements=max_measurements, max_points_shown=max_points_shown, monitor=monitor)
-        save_csv()
-        sleep(repeat_delay)
+    try:
+        for _ in range(count):
+            measure_func()
+            save_csv()
+            sleep(repeat_delay)
+    except KeyboardInterrupt:
+        pass
 
 
 def get_dataframe():
     """
-    Get a pandas dataframe from the data in smua.nvbuffer1
+    Get a pandas dataframe from the data in smua.nvbuffer1 and smua.nvbuffer2
     """
     global k, settings, _runtime_vars
     if test:
@@ -241,16 +298,18 @@ def load_settings():
     global settings, config_path
     with open(config_path, "r") as file:
         settings = json.load(file)
-    settings["datadir"] = path.expanduser(settings["datadir"])
+    settings["datadir"] = path.expanduser(settings["datadir"])  # replace ~
 
 def help(topic=None):
     if topic == None:
         print("""
 Functions:
-    measure         - measure the voltage
-    monitor         - measure the voltage with live monitoring in a matplotlib window
-    automeasure     - measure and save to csv multiple times
-    get_dataframe   - return smua.nvbuffer1 as pandas dataframe
+    measure         - take measurements
+    monitor         - take measurements with live monitoring in a matplotlib window
+    measure_count   - take a fixed number of measurements
+    monitor_count   - take a fixed number of measurements with live monitoring in a matplotlib window
+    repeat          - measure and save to csv multiple times
+    get_dataframe   - return smua.nvbuffer 1 and 2 as pandas dataframe
     save_csv        - save the last measurement as csv file
     save_pickle     - save the last measurement as pickled pandas dataframe
     load_dataframe  - load a pandas dataframe from csv or pickle
@@ -303,7 +362,7 @@ def init():
 |      <    ______   |    |    |    __)_  /   |   \ /   \  ___
 |    |  \  /_____/   |    |    |        \/    |    \\    \_\  \
 |____|__ \           |____|   /_______  /\____|__  / \______  /
-        \/                            \/         \/         \/      1.0
+        \/                            \/         \/         \/      1.1
 Interactive Shell for TENG measurements with Keithley 2600B
 ---
 Enter 'help()' for a list of commands""")
