@@ -54,7 +54,7 @@ k = None
 
 
 def _update_print(i, ival, vval):
-    print(f"{i:5d} - {ival:.12f} A - {vval:.5f} V" + " "*10, end='\r')
+    print(f"n = {i:5d}, I = {ival: .12f} A, U = {vval: .5f} V" + " "*10, end='\r')
 
 class _Monitor:
     """
@@ -68,7 +68,7 @@ class _Monitor:
         self.idata = []
 
         plt.ion()
-        self.fig1, (self.vax, self.iax) = plt.subplots(2, 1)
+        self.fig1, (self.vax, self.iax) = plt.subplots(2, 1, figsize=(8, 5))
 
         self.vline,  = self.vax.plot(self.index, self.vdata, color="g")
         self.vax.set_ylabel("Voltage [V]")
@@ -221,6 +221,7 @@ def repeat(measure_func: callable, count: int, repeat_delay=0):
             sleep(repeat_delay)
     except KeyboardInterrupt:
         pass
+    if settings["beep"]: k.write("beeper.beep(0.3, 1000)")
 
 
 def get_dataframe():

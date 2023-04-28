@@ -46,13 +46,14 @@ def measure_count(instr, V=True, I=True, count=100, interval=0.05, update_func=N
     sleep(update_interval)
     # for live viewing
 
+    query = """if smua.nvbufferX.n > 0 then print(smua.nvbufferX.readings[smua.nvbufferX.n]) else print(0) end"""
     # will return 2.0 while measruing
     while condition():
         if update_func and V and I:
             try:
                 if not testing:
-                    ival = float(instr.query("print(smua.nvbuffer1.readings[smua.nvbuffer1.n])").strip("\n"))
-                    vval = float(instr.query("print(smua.nvbuffer2.readings[smua.nvbuffer2.n])").strip("\n"))
+                    ival = float(instr.query(query.replace("X", "1")).strip("\n"))
+                    vval = float(instr.query(query.replace("X", "2")).strip("\n"))
                 else:
                     ival = _testing.testcurve(i, peak_width=1, amplitude=5e-8)
                     vval = -_testing.testcurve(i, peak_width=2, amplitude=15)
