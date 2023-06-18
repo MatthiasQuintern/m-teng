@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools"]
+
+[project]
+name = "k_teng"
+version = "1.0.0"
+description = "Interactive utility for I-V measurements with a Keitley 2600 SMU"
+requires-python = ">=3.10"
+readme = "readme.md"
+license = {file = "LICENSE"}
+authors = [
+    { name = "Matthias Quintern", email = "matthias@quintern.xyz" }
+]
+classifiers = [
+    "Operating System :: POSIX :: Linux",
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+]
+dependencies = [
+    "matplotlib>=3.6",
+    "numpy",
+    "pyvisa",
+    "pyvisa-py"
+]
+
+[project.urls]
+repository = "https://git.quintern.xyz/MatthiasQuintern/k-teng"
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[project.scripts]
+k-teng = "k_teng.k_teng_interactive:main"

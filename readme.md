@@ -1,23 +1,39 @@
-# K-TENG
-Helper scripts and shell for measuring **T**ribo**e**lectric **N**ano**g**enerator-based sensor output with a Keithley 2611B SMU using pyvisa
+# m-TENG
+Helper scripts and shell for measuring **T**ribo**e**lectric **N**ano**g**enerator-based sensor output with a Keithley 2611B SMU or an Arduino
 
 ## Features
-### Useful functions for scripts
-- Measure Voltage and/or Current
-- Transfer buffer from device to host
-- Save/load as csv
-- Run lua script on device
-- Auto-filenames
+
 ### Interactive (shell) mode
 - Live view
 - Press button to stop
 - Save and load settings (default interval, data directory...)
 - Easily run arbitrary command on device
 
+
+### Useful functions for scripts
+- Measure voltage and/or current
+- Transfer buffer from measurement device to host
+- Save/load as csv
+- Run lua script on Keithley SMU
+- Auto-filenames
+
+## Available backends
+### keithley
+    Use a Keithley 2611B Source-Measure-Unit via *pyvisa*. This backend allows measuring both voltage and current simultaneously.
+
+### arduino
+    Use a Bluetooth capable Arduino with [https://git.quintern.xyz/MatthiasQuintern/teng-arduino](this software on the arduino).
+    This backend only allows measuring voltage using an Arduinos analog input pin (0-5 V, 10 bit resolution).
+
+### testing
+    Use the shell without measuring TENG output. When starting a measurement, sample data will be generated.
+
+
 ## Shell mode
-Start with:
+It is recommended to run the shell with ipython:
 ```shell
-ipython -i k_teng_interactive.py
+ipython -i k_teng_interactive.py -- -*X*
 ```
+Substitute *X* for `-k` for keithley backend, `-a` for arduino backend or `-t` for testing backend.
 
 Use `help()` to get a list of available commands

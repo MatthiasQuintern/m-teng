@@ -1,6 +1,6 @@
 """
 run this before using this library:
-ipython -i k_teng_interactive.py
+ipython -i m_teng_interactive.py
 
 always records iv-t curves
     i-data -> smua.nvbuffer1
@@ -18,21 +18,54 @@ from os import path, makedirs
 import pickle as pkl
 import json
 
+import argparse
+
+
 if __name__ == "__main__":
+    import sys
     if __package__ is None:
         # make relative imports work as described here: https://peps.python.org/pep-0366/#proposed-change
-        __package__ = "k-teng"
-        import sys
+        __package__ = "m_teng"
         from os import path
         filepath = path.realpath(path.abspath(__file__))
         sys.path.insert(0, path.dirname(path.dirname(filepath)))
+    parser = argparse.ArgumentParser(
+        prog="m-teng",
+        description="measure triboelectric nanogenerator output using a Keithley SMU or an Arduino",
+    )
+    backend_group = parser.add_mutually_exclusive_group(required=True)
+    backend_group.add_argument("-k", "--keithley", action="store_true")
+    backend_group.add_argument("-a", "--arduino", action="store_true")
+    backend_group.add_argument("-t", "--testing", action='store_true')
+    parser.add_argument("-c", "--config", action="store", help="alternate path to config file")
+    args = vars(parser.parse_args())
+
+    i = 1
+    while i < len(sys.argv):
+        if args["keithley"]:
+            import m_teng.backends.keithley.keithley as _backend
+            import m_teng.backends.keithley.measure as _measure
+        elif args["arduino"]:
+            import m_teng.backends.arduino.arduino as _backend
+            import m_teng.backends.arduino.measure as _measure
+        elif args["testing"]:
+            import m_teng.backends.testing.testing as _backend
+            import m_teng.backends.testing.measure as _measure
+        elif sys.argv[i] in ["-c", "--config"]:
+            if i+1 < len(sys.argv):
+                config_path = sys.argv[i+1]
+            else:
+                print("-c requires an extra argument: path of config file")
+            i += 1
+        i += 1
 
 
-from .keithley import keithley as _keithley
-from .keithley.measure import measure_count as _measure_count, measure as _measure
-from .utility import data as _data
-from .utility.data import load_dataframe
-from .utility import file_io
+from m_teng.utility import data as _data
+from m_teng.utility.data import load_dataframe
+from m_teng.utility import file_io
+from m_teng.update_funcs import _Monitor, _ModelPredict, _update_print
+
+config_path = path.expanduser("~/.config/k-teng.json")
 
 _runtime_vars = {
     "last-measurement": ""
@@ -44,66 +77,35 @@ settings = {
     "interval":     0.02,
     "beep":         True,
 }
-config_path = path.expanduser("~/.config/k-teng.json")
 
 test = False
 
-# global variable for the instrument returned by pyvisa
-k = None
+# global variable for the instrument/client returned by pyvisa/bleak
+dev = None
 
 
-
-def _update_print(i, ival, vval):
-    print(f"n = {i:5d}, I = {ival: .12f} A, U = {vval: .5f} V" + " "*10, end='\r')
-
-class _Monitor:
+def monitor_predict(model_dir: str, count=5000, interval=settings["interval"], max_points_shown=160):
     """
-    Monitor v and i data
+    Take <count> measurements in <interval> and predict with a machine learning model
     """
-    def __init__(self, max_points_shown=None, use_print=False):
-        self.max_points_shown = max_points_shown
-        self.use_print = use_print
-        self.index = []
-        self.vdata = []
-        self.idata = []
+    model_predict = _ModelPredict(dev, model_dir)
+    plt_monitor = _Monitor(max_points_shown, use_print=False)
+    skip_n = 0
+    def update(i, ival, vval):
+        plt_monitor.update(i, ival, vval)
+        if skip_n % 10 == 0:
+            model_predict.update(i, ival, vval)
+        skip_n += 1
 
-        plt.ion()
-        self.fig1, (self.vax, self.iax) = plt.subplots(2, 1, figsize=(8, 5))
-
-        self.vline,  = self.vax.plot(self.index, self.vdata, color="g")
-        self.vax.set_ylabel("Voltage [V]")
-        self.vax.grid(True)
-
-        self.iline,  = self.iax.plot(self.index, self.idata, color="m")
-        self.iax.set_ylabel("Current [A]")
-        self.iax.grid(True)
-
-    def update(self, i, ival, vval):
-        if self.use_print:
-            _update_print(i, ival, vval)
-        self.index.append(i)
-        self.idata.append(ival)
-        self.vdata.append(vval)
-        # update data
-        self.iline.set_xdata(self.index)
-        self.iline.set_ydata(self.idata)
-        self.vline.set_xdata(self.index)
-        self.vline.set_ydata(self.vdata)
-        # recalculate limits and set them for the view
-        self.iax.relim()
-        self.vax.relim()
-        if self.max_points_shown and i > self.max_points_shown:
-            self.iax.set_xlim(i - self.max_points_shown, i)
-            self.vax.set_xlim(i - self.max_points_shown, i)
-        self.iax.autoscale_view()
-        self.vax.autoscale_view()
-        # update plot
-        self.fig1.canvas.draw()
-        self.fig1.canvas.flush_events()
-
-    def __del__(self):
-        plt.close(self.fig1)
-
+    print(f"Starting measurement with:\n\tinterval = {interval}s\nSave the data using 'save_csv()' afterwards.")
+    try:
+        _measure.measure_count(dev, V=True, I=True, count=count, interval=interval, beep_done=False, verbose=False, update_func=update, update_interval=0.1)
+    except KeyboardInterrupt:
+        if args["keithley"]:
+            dev.write(f"smua.source.output = smua.OUTPUT_OFF")
+        print("Monitoring cancelled, measurement might still continue" + " "*50)
+    else:
+        print("Measurement finished" + " "*50)
 
 def monitor_count(count=5000, interval=settings["interval"], max_points_shown=160):
     """
@@ -123,10 +125,10 @@ def monitor_count(count=5000, interval=settings["interval"], max_points_shown=16
 
     print(f"Starting measurement with:\n\tinterval = {interval}s\nSave the data using 'save_csv()' afterwards.")
     try:
-        _measure_count(k, V=True, I=True, count=count, interval=interval, beep_done=False, verbose=False, update_func=update_func, update_interval=0.05, testing=test)
+        _measure.measure_count(dev, V=True, I=True, count=count, interval=interval, beep_done=False, verbose=False, update_func=update_func, update_interval=0.05)
     except KeyboardInterrupt:
-        if not test:
-            k.write(f"smua.source.output = smua.OUTPUT_OFF")
+        if args["keithley"]:
+            dev.write(f"smua.source.output = smua.OUTPUT_OFF")
         print("Monitoring cancelled, measurement might still continue" + " "*50)
     else:
         print("Measurement finished" + " "*50)
@@ -147,10 +149,10 @@ def measure_count(count=5000, interval=settings["interval"]):
 
     print(f"Starting measurement with:\n\tinterval = {interval}s\nSave the data using 'save_csv()' afterwards.")
     try:
-        _measure_count(k, V=True, I=True, count=count, interval=interval, beep_done=False, verbose=False, update_func=update_func, update_interval=0.05, testing=test)
+        _measure.measure_count(dev, count=count, interval=interval, beep_done=False, verbose=False, update_func=update_func, update_interval=0.05)
     except KeyboardInterrupt:
-        if not test:
-            k.write(f"smua.source.output = smua.OUTPUT_OFF")
+        if args["keithley"]:
+            dev.write(f"smua.source.output = smua.OUTPUT_OFF")
         print("Monitoring cancelled, measurement might still continue" + " "*50)
     else:
         print("Measurement finished" + " "*50)
@@ -176,7 +178,7 @@ def monitor(interval=settings["interval"], max_measurements=None, max_points_sho
     print(f"Starting measurement with:\n\tinterval = {interval}s\nUse <C-c> to stop. Save the data using 'save_csv()' afterwards.")
     plt_monitor = _Monitor(use_print=True, max_points_shown=max_points_shown)
     update_func = plt_monitor.update
-    _measure(k, interval=interval, max_measurements=max_measurements, update_func=update_func, testing=test)
+    _measure.measure(dev, interval=interval, max_measurements=max_measurements, update_func=update_func)
 
 
 def measure(interval=settings["interval"], max_measurements=None):
@@ -195,7 +197,7 @@ def measure(interval=settings["interval"], max_measurements=None):
     _runtime_vars["last_measurement"] = dtime.now().isoformat()
     print(f"Starting measurement with:\n\tinterval = {interval}s\nUse <C-c> to stop. Save the data using 'save_csv()' afterwards.")
     update_func = _update_print
-    _measure(k, interval=interval, max_measurements=max_measurements, update_func=update_func, testing=test)
+    _measure.measure(dev, interval=interval, max_measurements=max_measurements, update_func=update_func)
 
 
 def repeat(measure_func: callable, count: int, repeat_delay=0):
@@ -221,7 +223,7 @@ def repeat(measure_func: callable, count: int, repeat_delay=0):
             sleep(repeat_delay)
     except KeyboardInterrupt:
         pass
-    if settings["beep"]: k.write("beeper.beep(0.3, 1000)")
+    if settings["beep"]: _backend.beep()
 
 
 def get_dataframe():
@@ -229,20 +231,13 @@ def get_dataframe():
     Get a pandas dataframe from the data in smua.nvbuffer1 and smua.nvbuffer2
     """
     global k, settings, _runtime_vars
-    if test:
-        timestamps = np.arange(0, 50, 0.01)
-        ydata = np.array([testing.testcurve(t, amplitude=15, peak_width=2) for t in timestamps])
-        ibuffer = np.vstack((timestamps, ydata)).T
-
-        ydata = np.array([-testing.testcurve(t, amplitude=5e-8, peak_width=1) for t in timestamps])
-        vbuffer = np.vstack((timestamps, ydata)).T
-    else:
-        ibuffer = _keithley.collect_buffer(k, 1)
-        vbuffer = _keithley.collect_buffer(k, 2)
+    ibuffer = _backend.collect_buffer(dev, 1)
+    vbuffer = _backend.collect_buffer(dev, 2)
     df = _data.buffers2dataframe(ibuffer, vbuffer)
     df.basename = file_io.get_next_filename(settings["name"], settings["datadir"])
     df.name = f"{df.basename} @ {_runtime_vars['last-measurement']}"
     return df
+
 
 def save_csv():
     """
@@ -267,6 +262,7 @@ def save_pickle():
     df.to_pickle(filename)
     print(f"Saved as '{filename}'")
 
+
 def run_script(script_path):
     """
     Run a lua script on the Keithley device
@@ -276,7 +272,7 @@ def run_script(script_path):
     if test:
         print("run_script: Test mode enabled, ignoring call to run_script")
     else:
-        _keithley.run_lua(k, script_path=script_path)
+        _keithley.run_lua(dev, script_path=script_path)
 
 
 def set(setting, value):
@@ -333,13 +329,13 @@ Run 'help("topic")' to see more information on a topic""")
 Functions:
     name("<name>")         - short for set("name", "<name>")
     set("setting", value)  - set a setting to a value
-    save_settings()        - store the settings as "k-teng.conf" in the working directory
+    save_settings()        - store the settings as "m-teng.json" in the working directory
     load_settings()        - load settings from a file
     The global variable 'config_path' determines the path used by save/load_settings. Use -c '<path>' to set another path.
     The serach path is:
-        <working-dir>/k-teng.json
-        $XDG_CONFIG_HOME/k-teng.json
-        ~/.config/k-teng.json
+        <working-dir>/m-teng.json
+        $XDG_CONFIG_HOME/m-teng.json
+        ~/.config/m-teng.json
               """)
     elif topic == "imports":
         print("""Imports:
@@ -349,7 +345,7 @@ Functions:
     os.path """)
     elif topic == "device":
         print("""Device:
-    The opened pyvisa resource (Keithley device) is the global variable 'k'.
+    The opened pyvisa resource (deveithley device) is the global variable 'k'.
     You can interact using pyvisa functions, such as
     k.write("command"), k.query("command") etc. to interact with the device.""")
     else:
@@ -357,37 +353,26 @@ Functions:
 
 
 def init():
-    global k, settings, test, config_path
-    print(r""" ____  __.         ______________________ _______     ________
-|    |/ _|         \__    ___/\_   _____/ \      \   /  _____/
-|      <    ______   |    |    |    __)_  /   |   \ /   \  ___
-|    |  \  /_____/   |    |    |        \/    |    \\    \_\  \
-|____|__ \           |____|   /_______  /\____|__  / \______  /
-        \/                            \/         \/         \/      1.1
+    global dev, settings, config_path
+    print(r"""              ______________________ _______     ________
+  _____       \__    ___/\_   _____/ \      \   /  _____/
+ /     \  ______|    |    |    __)_  /   |   \ /   \  ___
+|  Y Y  \/_____/|    |    |        \/    |    \\    \_\  \
+|__|_|  /       |____|   /_______  /\____|__  / \______  /
+      \/                         \/         \/         \/   1.2
 Interactive Shell for TENG measurements with Keithley 2600B
 ---
 Enter 'help()' for a list of commands""")
     from os import environ
-    if path.isfile("k-teng.json"):
-        config_path = "k-teng.json"
+    if path.isfile("m-teng.json"):
+        config_path = "m-teng.json"
     elif 'XDG_CONFIG_HOME' in environ.keys():
-        # and path.isfile(environ["XDG_CONFIG_HOME"] + "/k-teng.json"):
-        config_path = environ["XDG_CONFIG_HOME"] + "/k-teng.json"
+        # and path.isfile(environ["XDG_CONFIG_HOME"] + "/m-teng.json"):
+        config_path = environ["XDG_CONFIG_HOME"] + "/m-teng.json"
     else:
-        config_path = path.expanduser("~/.config/k-teng.json")
-
-    from sys import argv
-    i = 1
-    while i < len(argv):
-        if argv[i] in ["-t", "--test"]:
-            test = True
-        elif argv[i] in ["-c", "--config"]:
-            if i+1 < len(argv):
-                config_path = argv[i+1]
-            else:
-                print("-c requires an extra argument: path of config file")
-            i += 1
-        i += 1
+        config_path = path.expanduser("~/.config/m-teng.json")
+    if args["config"]:
+        config_path = args["config"]
 
 
     if not path.isdir(path.dirname(config_path)):
@@ -399,15 +384,11 @@ Enter 'help()' for a list of commands""")
     if not path.isdir(settings["datadir"]):
         makedirs(settings["datadir"])
 
-    if not test:
-        from .keithley.keithley import init_keithley
-        try:
-            k = init_keithley(beep_success=settings["beep"])
-        except Exception as e:
-            print(e)
-            exit()
-    else:
-        print("Running in test mode, device will not be connected.")
+    try:
+        dev = _backend.init(beep_success=settings["beep"])
+    except Exception as e:
+        print(e)
+        exit(1)
 
 
 if __name__ == "__main__":
