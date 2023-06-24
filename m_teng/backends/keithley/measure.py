@@ -3,8 +3,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pyvisa
 
-from .keithley import reset
-from ..utility import testing as _testing
+from m_teng.backends.keithley import reset
+from m_teng.utility import testing as _testing
 
 def measure_count(instr, count=100, interval=0.05, update_func=None, update_interval=0.5, beep_done=True, verbose=True):
     """

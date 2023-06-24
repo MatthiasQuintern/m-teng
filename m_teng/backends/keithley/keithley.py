@@ -31,6 +31,11 @@ def init(beep_success=True):
         return keithley
 
 
+def exit(instr):
+    instr.close()
+
+
+
 def run_lua(instr, script_path, verbose=False):
     """
     Run a lua script from the host on the instrument

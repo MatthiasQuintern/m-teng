@@ -26,11 +26,11 @@ class _Monitor:
         plt.ion()
         self.fig1, (self.vax, self.iax) = plt.subplots(2, 1, figsize=(8, 5))
 
-        self.vline,  = self.vax.plot(self.index, self.vdata, color="g")
+        self.vline, = self.vax.plot(self.index, self.vdata, color="g")
         self.vax.set_ylabel("Voltage [V]")
         self.vax.grid(True)
 
-        self.iline,  = self.iax.plot(self.index, self.idata, color="m")
+        self.iline, = self.iax.plot(self.index, self.idata, color="m")
         self.iax.set_ylabel("Current [A]")
         self.iax.grid(True)
 
