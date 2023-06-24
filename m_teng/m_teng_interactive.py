@@ -17,6 +17,7 @@ from time import sleep
 from os import path, makedirs
 import pickle as pkl
 import json
+import atexit
 
 import argparse
 
@@ -99,7 +100,7 @@ def monitor_predict(model_dir: str, count=5000, interval=settings["interval"], m
 
     print(f"Starting measurement with:\n\tinterval = {interval}s\nSave the data using 'save_csv()' afterwards.")
     try:
-        _measure.measure_count(dev, V=True, I=True, count=count, interval=interval, beep_done=False, verbose=False, update_func=update, update_interval=0.1)
+        _measure.measure_count(dev, count=count, interval=interval, beep_done=False, verbose=False, update_func=update, update_interval=0.1)
     except KeyboardInterrupt:
         if args["keithley"]:
             dev.write(f"smua.source.output = smua.OUTPUT_OFF")
@@ -125,7 +126,7 @@ def monitor_count(count=5000, interval=settings["interval"], max_points_shown=16
 
     print(f"Starting measurement with:\n\tinterval = {interval}s\nSave the data using 'save_csv()' afterwards.")
     try:
-        _measure.measure_count(dev, V=True, I=True, count=count, interval=interval, beep_done=False, verbose=False, update_func=update_func, update_interval=0.05)
+        _measure.measure_count(dev, count=count, interval=interval, beep_done=False, verbose=False, update_func=update_func, update_interval=0.05)
     except KeyboardInterrupt:
         if args["keithley"]:
             dev.write(f"smua.source.output = smua.OUTPUT_OFF")
@@ -301,16 +302,16 @@ def help(topic=None):
     if topic == None:
         print("""
 Functions:
-    measure         - take measurements
-    monitor         - take measurements with live monitoring in a matplotlib window
-    measure_count   - take a fixed number of measurements
-    monitor_count   - take a fixed number of measurements with live monitoring in a matplotlib window
-    repeat          - measure and save to csv multiple times
-    get_dataframe   - return smua.nvbuffer 1 and 2 as pandas dataframe
-    save_csv        - save the last measurement as csv file
-    save_pickle     - save the last measurement as pickled pandas dataframe
-    load_dataframe  - load a pandas dataframe from csv or pickle
-    run_script      - run a lua script on the Keithely device
+    measure         [kat] - take measurements
+    monitor         [kat] - take measurements with live monitoring in a matplotlib window
+    measure_count   [kat] - take a fixed number of measurements
+    monitor_count   [kat] - take a fixed number of measurements with live monitoring in a matplotlib window
+    repeat          [kat] - measure and save to csv multiple times
+    get_dataframe   [kat] - return device internal buffer as pandas dataframe
+    save_csv        [kat] - save the last measurement as csv file
+    save_pickle     [kat] - save the last measurement as pickled pandas dataframe
+    load_dataframe  [kat] - load a pandas dataframe from csv or pickle
+    run_script      [k  ] - run a lua script on the Keithely device
 Run 'help(function)' to see more information on a function
 
 Available topics:
@@ -345,9 +346,12 @@ Functions:
     os.path """)
     elif topic == "device":
         print("""Device:
-    The opened pyvisa resource (deveithley device) is the global variable 'k'.
-    You can interact using pyvisa functions, such as
-    k.write("command"), k.query("command") etc. to interact with the device.""")
+    keithley backend:
+        The opened pyvisa resource (deveithley device) is the global variable 'dev'.
+        You can interact using pyvisa functions, such as
+        k.write("command"), k.query("command") etc. to interact with the device.
+    arduino backend:
+        The Arduino will be avaiable as BleakClient using the global variable 'dev'.  """)
     else:
         print(topic.__doc__)
 
@@ -389,6 +393,7 @@ Enter 'help()' for a list of commands""")
     except Exception as e:
         print(e)
         exit(1)
+    atexit.register(_backend.exit, dev)
 
 
 if __name__ == "__main__":
