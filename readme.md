@@ -23,7 +23,7 @@ Helper scripts and shell for measuring **T**ribo**e**lectric **N**ano**g**enerat
 
 ### arduino
     Use a Bluetooth capable Arduino with [https://git.quintern.xyz/MatthiasQuintern/teng-arduino](this software on the arduino).
-    This backend only allows measuring voltage using an Arduinos analog input pin (0-5 V, 10 bit resolution).
+    This backend only allows measuring voltage using an Arduinos analog input pin (0 - 3.3 V, 12 bit resolution).
 
 ### testing
     Use the shell without measuring TENG output. When starting a measurement, sample data will be generated.
@@ -36,4 +36,4 @@ ipython -i k_teng_interactive.py -- -*X*
 ```
 Substitute *X* for `-k` for keithley backend, `-a` for arduino backend or `-t` for testing backend.
 
-Use `help()` to get a list of available commands
+In the shell, run `help()` to get a list of available commands
