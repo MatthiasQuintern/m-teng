@@ -36,8 +36,8 @@ arduino = [
 repository = "https://github.com/MatthiasQuintern/m-teng"
 
 
+[project.scripts]
+m-teng = "m_teng.m_teng_interactive:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
-
-[project.scripts]
-k-teng = "m_teng.m_teng_interactive:main"
