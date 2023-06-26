@@ -2,14 +2,14 @@
 requires = ["setuptools"]
 
 [project]
-name = "k_teng"
-version = "1.0.0"
-description = "Interactive utility for I-V measurements with a Keitley 2600 SMU"
+name = "m_teng"
+version = "1.1.0"
+description = "Interactive utility for voltage measurements with a Keitley 2600 SMU or an Arduino"
 requires-python = ">=3.10"
 readme = "readme.md"
 license = {file = "LICENSE"}
 authors = [
-    { name = "Matthias Quintern", email = "matthias@quintern.xyz" }
+    { name = "Matthias Quintern", email = "matthias.quintern@posteo.de" }
 ]
 classifiers = [
     "Operating System :: POSIX :: Linux",
@@ -20,16 +20,24 @@ classifiers = [
 dependencies = [
     "matplotlib>=3.6",
     "numpy",
+]
+
+[project.optional-dependencies]
+keithley = [
     "pyvisa",
     "pyvisa-py"
 ]
+arduino = [
+    "bleak >= 0.20"
+]
+
 
 [project.urls]
-repository = "https://git.quintern.xyz/MatthiasQuintern/k-teng"
+repository = "https://github.com/MatthiasQuintern/m-teng"
 
 
 [tool.setuptools.packages.find]
 where = ["."]
 
 [project.scripts]
-k-teng = "k_teng.k_teng_interactive:main"
+k-teng = "m_teng.m_teng_interactive:main"
