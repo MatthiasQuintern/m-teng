@@ -1,0 +1,8 @@
+# Rule for Keithley 2611B
+
+# take vendor and product id from lsusb
+SUBSYSTEMS=="usb", ACTION=="add", ATTRS{idVendor}=="05e6", ATTRS{idProduct}=="2614", GROUP="usbtmc", MODE="0660" RUN+="/bin/touch /tmp/05e6-2611-connected"
+
+# Devices
+KERNEL=="usbtmc/*",       MODE="0660", GROUP="usbtmc"
+KERNEL=="usbtmc[0-9]*",   MODE="0660", GROUP="usbtmc"

@@ -37,3 +37,10 @@ ipython -i k_teng_interactive.py -- -*X*
 Substitute *X* for `-k` for keithley backend, `-a` for arduino backend or `-t` for testing backend.
 
 In the shell, run `help()` to get a list of available commands
+
+
+## Installation
+### Keithley
+On linux:
+Install the udev rule in `/etc/udev/rules.d/` and run `sudo udevadm control --reload` to force the usbtmc driver to be used with the Keithley SMU.
+The `ATTRS{product_id} ` needs to match the id shown by `lsusb`.
