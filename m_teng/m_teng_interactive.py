@@ -75,7 +75,7 @@ _runtime_vars = {
 settings = {
     "datadir":      path.expanduser("~/data"),
     "name":         "measurement",
-    "interval":     0.02,
+    "interval":     0.05,
     "beep":         True,
 }
 
@@ -85,10 +85,12 @@ test = False
 dev = None
 
 
-def monitor_predict(model_dir: str, count=5000, interval=settings["interval"], max_points_shown=160):
+def monitor_predict(model_dir: str, count=5000, interval=None, max_points_shown=160):
     """
     Take <count> measurements in <interval> and predict with a machine learning model
     """
+    if not interval: interval = settings["interval"]
+
     model_predict = _ModelPredict(dev, model_dir)
     plt_monitor = _Monitor(max_points_shown, use_print=False)
     skip_n = 0
@@ -108,7 +110,7 @@ def monitor_predict(model_dir: str, count=5000, interval=settings["interval"], m
     else:
         print("Measurement finished" + " "*50)
 
-def monitor_count(count=5000, interval=settings["interval"], max_points_shown=160):
+def monitor_count(count=5000, interval=None, max_points_shown=160):
     """
     Take <count> measurements in <interval> and monitor live with matplotlib.
 
@@ -121,6 +123,7 @@ def monitor_count(count=5000, interval=settings["interval"], max_points_shown=16
     @param interval: interval, defaults to settings["interval"]
     @param max_points_shown: how many points should be shown at once. None means infinite
     """
+    if not interval: interval = settings["interval"]
     plt_monitor = _Monitor(max_points_shown, use_print=True)
     update_func = plt_monitor.update
 
@@ -134,7 +137,7 @@ def monitor_count(count=5000, interval=settings["interval"], max_points_shown=16
     else:
         print("Measurement finished" + " "*50)
 
-def measure_count(count=5000, interval=settings["interval"]):
+def measure_count(count=5000, interval=None):
     """
     Take <count> measurements in <interval>
 
@@ -146,6 +149,7 @@ def measure_count(count=5000, interval=settings["interval"]):
     @param count: count
     @param interval: interval, defaults to settings["interval"]
     """
+    if not interval: interval = settings["interval"]
     update_func = _update_print
 
     print(f"Starting measurement with:\n\tinterval = {interval}s\nSave the data using 'save_csv()' afterwards.")
@@ -161,7 +165,7 @@ def measure_count(count=5000, interval=settings["interval"]):
 
 
 
-def monitor(interval=settings["interval"], max_measurements=None, max_points_shown=160):
+def monitor(interval=None, max_measurements=None, max_points_shown=160):
     """
     Monitor the voltage with matplotlib.
 
@@ -176,13 +180,14 @@ def monitor(interval=settings["interval"], max_measurements=None, max_points_sho
     """
     global _runtime_vars
     _runtime_vars["last_measurement"] = dtime.now().isoformat()
+    if not interval: interval = settings["interval"]
     print(f"Starting measurement with:\n\tinterval = {interval}s\nUse <C-c> to stop. Save the data using 'save_csv()' afterwards.")
     plt_monitor = _Monitor(use_print=True, max_points_shown=max_points_shown)
     update_func = plt_monitor.update
     _measure.measure(dev, interval=interval, max_measurements=max_measurements, update_func=update_func)
 
 
-def measure(interval=settings["interval"], max_measurements=None):
+def measure(interval=None, max_measurements=None):
     """
     Measure voltages
 
@@ -195,6 +200,7 @@ def measure(interval=settings["interval"], max_measurements=None):
     @param max_measurements : maximum number of measurements. None means infinite
     """
     global _runtime_vars
+    if not interval: interval = settings["interval"]
     _runtime_vars["last_measurement"] = dtime.now().isoformat()
     print(f"Starting measurement with:\n\tinterval = {interval}s\nUse <C-c> to stop. Save the data using 'save_csv()' afterwards.")
     update_func = _update_print
