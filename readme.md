@@ -1,5 +1,5 @@
 # m-TENG
-Helper scripts and shell for measuring **T**ribo**e**lectric **N**ano**g**enerator-based sensor output with a Keithley 2611B SMU or an Arduino
+Helper scripts and shell for measuring **T**ribo**e**lectric **N**ano**g**enerator-based sensor output with a Keithley 2600B SMU or an Arduino
 
 ## Features
 
@@ -17,9 +17,10 @@ Helper scripts and shell for measuring **T**ribo**e**lectric **N**ano**g**enerat
 - Run lua script on Keithley SMU
 - Auto-filenames
 
+
 ## Available backends
 ### keithley
-    Use a Keithley 2611B Source-Measure-Unit via *pyvisa*. This backend allows measuring both voltage and current simultaneously.
+    Use a Keithley 2600B Source-Measure-Unit via *pyvisa*. This backend allows measuring both voltage and current simultaneously. *Tested with 2611B and 2614B*
 
 ### arduino
     Use a Bluetooth capable Arduino with [https://git.quintern.xyz/MatthiasQuintern/teng-arduino](this software on the arduino).
