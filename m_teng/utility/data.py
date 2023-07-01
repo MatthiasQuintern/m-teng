@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from os import path
+import matplotlib.pyplot
 
 def buffer2dataframe(buffer):
     df = pd.DataFrame(buffer)
@@ -30,3 +31,23 @@ def load_dataframe(p:str):
     else:
         df = pd.read_pickle(p)
     return df
+
+
+def plot(data):
+    if type(data) == str:
+        data = load_dataframe(data)
+    if type(data) == pd.Dataframe:
+        data = data.to_numpy()
+    fig1, (vax, iax) = plt.subplots(2, 1, figsize=(8, 5))
+    # todo
+
+
+    vline, = vax.plot(index, vdata, color="m")
+    vax.set_ylabel("Voltage [V]")
+    vax.grid(True)
+
+    vax.plot()
+
+    iline, = iax.plot(index, idata, color="m")
+    iax.set_ylabel("Current [A]")
+    iax.grid(True)
