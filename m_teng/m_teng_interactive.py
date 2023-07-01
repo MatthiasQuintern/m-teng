@@ -230,7 +230,7 @@ def repeat(measure_func: callable, count: int, repeat_delay=0):
             sleep(repeat_delay)
     except KeyboardInterrupt:
         pass
-    if settings["beep"]: _backend.beep()
+    if settings["beep"]: _backend.beep(dev)
 
 
 def get_dataframe():
