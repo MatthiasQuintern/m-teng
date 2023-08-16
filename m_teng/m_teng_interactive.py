@@ -66,7 +66,9 @@ from m_teng.utility.data import load_dataframe
 from m_teng.utility import file_io
 from m_teng.update_funcs import _Monitor, _ModelPredict, _update_print
 
-config_path = path.expanduser("~/.config/k-teng.json")
+from m_teng.backends import keithley as _keithley
+
+config_path = path.expanduser("~/.config/m-teng.json")
 
 _runtime_vars = {
     "last-measurement": ""
@@ -75,7 +77,7 @@ _runtime_vars = {
 settings = {
     "datadir":      path.expanduser("~/data"),
     "name":         "measurement",
-    "interval":     0.05,
+    "interval":     0.02,
     "beep":         True,
 }
 

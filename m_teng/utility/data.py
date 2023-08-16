@@ -1,11 +1,13 @@
 import pandas as pd
 import numpy as np
 from os import path
+import matplotlib.pyplot as plt
 
-def buffer2dataframe(buffer):
-    df = pd.DataFrame(buffer)
-    df.colums = ["Time [s]", "Voltage [V]"]
-    return df
+# deprecated
+# def buffer2dataframe(buffer):
+#     df = pd.DataFrame(buffer)
+#     df.colums = ["Time [s]", "Voltage [V]"]
+#     return df
 
 def buffers2dataframe(ibuffer, vbuffer):
     """
@@ -30,3 +32,38 @@ def load_dataframe(p:str):
     else:
         df = pd.read_pickle(p)
     return df
+
+def plot(data: str or pd.DataFrame or np.ndarray, title="", U=True, I=False):
+    """
+    Plot recorded data
+    @param data: filepath, dataframe or numpy array
+    """
+    if type(data) == str:
+        _data = load_dataframe(data).to_numpy()
+    elif type(data) == pd.DataFrame:
+        _data = data.to_numpy()
+    else:
+        _data = data
+    print(_data[0])
+    plt.ion()
+    fig, ax = plt.subplots()
+    ax.set_xlabel("t [s]")
+    vax = ax
+    iax = ax
+    if U and I:
+        iax = ax.twinx()
+    if U:
+        vax = ax
+        vax.set_ylabel("U [V]")
+        vax.plot(_data[:,0], _data[:,2], color="blue", label="voltage")
+    if I:
+        iax.set_ylabel("I [A]")
+        iax.plot(_data[:,0], _data[:,1], color="orange", label="current")
+    if U and I:
+        plt.legend()
+    return fig
+
+
+
+
+
