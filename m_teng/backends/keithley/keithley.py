@@ -30,6 +30,8 @@ def init(beep_success=True):
         if beep_success: keithley.write("beeper.beep(0.5, 1000)")
         return keithley
 
+def beep(instr, length=0.5, pitch=1000):
+    instr.write(f"beeper.beep({length}, {pitch})")
 
 def exit(instr):
     instr.close()
