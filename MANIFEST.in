@@ -1,2 +1,0 @@
-include regina/package-data/*
-include regina/sql/*.sql

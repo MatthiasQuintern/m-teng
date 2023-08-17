@@ -66,8 +66,6 @@ from m_teng.utility.data import load_dataframe
 from m_teng.utility import file_io
 from m_teng.update_funcs import _Monitor, _ModelPredict, _update_print
 
-from m_teng.backends import keithley as _keithley
-
 config_path = path.expanduser("~/.config/m-teng.json")
 
 _runtime_vars = {

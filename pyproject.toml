@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "matplotlib>=3.6",
     "numpy",
+    "pandas",
 ]
 
 [project.optional-dependencies]
