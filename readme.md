@@ -35,7 +35,7 @@ Use the shell without measuring TENG output. When starting a measurement, sample
 ## Shell mode
 It is recommended to run the shell with ipython:
 ```shell
-ipython -i k_teng_interactive.py -- -*X*
+ipython -i m_teng_interactive.py -- -*X*
 ```
 Substitute *X* for `-k` for keithley backend, `-a` for arduino backend or `-t` for testing backend.
 
