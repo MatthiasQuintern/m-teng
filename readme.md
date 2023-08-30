@@ -1,6 +1,8 @@
 # m-TENG
 Helper scripts and shell for measuring **T**ribo**e**lectric **N**ano**g**enerator-based sensor output with a Keithley 2600B SMU or an Arduino
 
+This project was written for my bachelor's thesis.
+
 ## Features
 
 ### Interactive (shell) mode
