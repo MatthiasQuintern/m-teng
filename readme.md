@@ -22,14 +22,14 @@ This project was written for my bachelor's thesis.
 
 ## Available backends
 ### keithley
-    Use a Keithley 2600B Source-Measure-Unit via *pyvisa*. This backend allows measuring both voltage and current simultaneously. *Tested with 2611B and 2614B*
+Use a Keithley 2600B Source-Measure-Unit via *pyvisa*. This backend allows measuring both voltage and current simultaneously. *Tested with 2611B and 2614B*
 
 ### arduino
-    Use a Bluetooth capable Arduino with [https://git.quintern.xyz/MatthiasQuintern/teng-arduino](this software on the arduino).
-    This backend only allows measuring voltage using an Arduinos analog input pin (0 - 3.3 V, 12 bit resolution).
+Use a Bluetooth capable Arduino with [https://git.quintern.xyz/MatthiasQuintern/teng-arduino](this software on the arduino).
+This backend only allows measuring voltage using an Arduinos analog input pin (0 - 3.3 V, 12 bit resolution).
 
 ### testing
-    Use the shell without measuring TENG output. When starting a measurement, sample data will be generated.
+Use the shell without measuring TENG output. When starting a measurement, sample data will be generated.
 
 
 ## Shell mode
